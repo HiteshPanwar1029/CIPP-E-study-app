@@ -5,13 +5,74 @@ import { useStore } from '../lib/store'
 import { dueCount } from '../lib/stats'
 
 const NAV = [
-  { to: '/', label: 'Dashboard', short: 'Home', end: true },
-  { to: '/learn', label: 'Learn', short: 'Learn', end: false },
-  { to: '/session', label: 'Session', short: 'Drill', end: false },
-  { to: '/results', label: 'Results', short: 'Review', end: false },
-  { to: '/reference', label: 'Reference', short: 'Refs', end: false },
-  { to: '/settings', label: 'Settings', short: 'Settings', end: false },
+  { to: '/', label: 'Dashboard', short: 'Home', icon: 'home', end: true },
+  { to: '/learn', label: 'Learn', short: 'Learn', icon: 'learn', end: false },
+  { to: '/session', label: 'Session', short: 'Drill', icon: 'drill', end: false },
+  { to: '/results', label: 'Results', short: 'Review', icon: 'review', end: false },
+  { to: '/reference', label: 'Reference', short: 'Refs', icon: 'refs', end: false },
+  { to: '/settings', label: 'Settings', short: 'Settings', icon: 'settings', end: false },
 ]
+
+const ICON = {
+  width: 24,
+  height: 24,
+  viewBox: '0 0 24 24',
+  fill: 'none',
+  stroke: 'currentColor',
+  strokeWidth: 1.8,
+  strokeLinecap: 'round',
+  strokeLinejoin: 'round',
+} as const
+
+function NavIcon({ name }: { name: string }) {
+  switch (name) {
+    case 'home':
+      return (
+        <svg {...ICON}>
+          <path d="M3 11.5 12 4l9 7.5" />
+          <path d="M5 10v9h14v-9" />
+        </svg>
+      )
+    case 'learn':
+      return (
+        <svg {...ICON}>
+          <path d="M12 4 2 9l10 5 10-5-10-5Z" />
+          <path d="M6 11.5V16c0 1.1 2.7 2.5 6 2.5s6-1.4 6-2.5v-4.5" />
+        </svg>
+      )
+    case 'drill':
+      return (
+        <svg {...ICON}>
+          <circle cx="12" cy="12" r="8.5" />
+          <path d="M10 8.5l5.5 3.5L10 15.5v-7Z" />
+        </svg>
+      )
+    case 'review':
+      return (
+        <svg {...ICON}>
+          <path d="M4.5 4.5v15h15" />
+          <path d="M8 15v-2.5M12 15V9M16 15v-4.5" />
+        </svg>
+      )
+    case 'refs':
+      return (
+        <svg {...ICON}>
+          <path d="M6 4h11a1.5 1.5 0 0 1 1.5 1.5V20H7.5A1.5 1.5 0 0 1 6 18.5V4Z" />
+          <path d="M9.5 8.5h5.5M9.5 12h5.5" />
+        </svg>
+      )
+    case 'settings':
+      return (
+        <svg {...ICON}>
+          <path d="M4 8h8M16 8h4M4 16h4M12 16h8" />
+          <circle cx="14" cy="8" r="2.3" />
+          <circle cx="8" cy="16" r="2.3" />
+        </svg>
+      )
+    default:
+      return null
+  }
+}
 
 export function Layout() {
   const init = useStore((s) => s.init)
@@ -69,16 +130,16 @@ export function Layout() {
             <ThemeToggle />
           </header>
           {/* extra bottom padding on mobile so the fixed bar never covers content */}
-          <main id="main" className="flex-1 px-5 pt-8 pb-24 sm:px-6 sm:pb-8">
+          <main id="main" className="flex-1 px-5 pt-8 pb-28 sm:px-6 sm:pb-8">
             <Outlet />
           </main>
         </div>
       </div>
 
-      {/* Mobile bottom navigation (thumb-reachable); hidden from ~640px up */}
+      {/* Mobile bottom navigation — taller, icon + label, thumb-reachable */}
       <nav
         aria-label="Primary"
-        className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-6 border-t border-border bg-surface sm:hidden"
+        className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-6 border-t border-border bg-surface shadow-[0_-1px_8px_rgba(0,0,0,0.06)] sm:hidden"
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
         {NAV.map((n) => (
@@ -87,16 +148,17 @@ export function Layout() {
             to={n.to}
             end={n.end}
             className={({ isActive }) =>
-              'flex flex-col items-center justify-center py-2 text-[10px] transition-colors ' +
+              'flex min-h-[58px] flex-col items-center justify-center gap-1 py-2 text-xs transition-colors ' +
               (isActive ? 'text-accent font-medium' : 'text-muted')
             }
           >
-            <span className="relative leading-none">
-              {n.short}
+            <span className="relative">
+              <NavIcon name={n.icon} />
               {n.to === '/session' && due > 0 && (
-                <span className="absolute -right-2 -top-1 h-1.5 w-1.5 rounded-full bg-accent" />
+                <span className="absolute -right-1.5 -top-1 h-2.5 w-2.5 rounded-full bg-accent ring-2 ring-surface" />
               )}
             </span>
+            <span className="leading-none">{n.short}</span>
           </NavLink>
         ))}
       </nav>
