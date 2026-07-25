@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useStore } from '../lib/store'
 import { DOMAINS } from '../lib/blueprint'
 import { competencyCoverage } from '../lib/stats'
@@ -120,6 +121,24 @@ export function Learn() {
           <span className="font-medium text-accent">{counts.mastered} mastered</span>, {counts.seen}{' '}
           seen, {counts.untouched} untouched.
         </p>
+      </Card>
+
+      <Card className="mb-6">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <h2 className="text-sm font-semibold">AI &amp; Governance module</h2>
+            <p className="mt-0.5 text-xs text-muted">
+              EU AI Act · GDPR × AI · ethics frameworks · DPIA methodology · governance frameworks —
+              notes + quizzes, tracked separately from the blueprint.
+            </p>
+          </div>
+          <Link
+            to="/aigov"
+            className="shrink-0 rounded-lg bg-accent px-3 py-2 text-sm font-medium text-accent-fg"
+          >
+            Open →
+          </Link>
+        </div>
       </Card>
       <div className="space-y-4">
         {DOMAINS.map((d) => (

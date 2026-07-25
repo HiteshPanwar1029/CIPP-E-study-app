@@ -129,6 +129,40 @@ export function competencyCoverage(reviews: ReviewLogEntry[]): Record<string, Co
   return out
 }
 
+export interface ExamPlan {
+  /** Whole days until the exam (0 = today, negative = past). */
+  daysLeft: number
+  /** Items not yet introduced into the SRS. */
+  unseen: number
+  /** Suggested new items per day, or null when the date is today/past. */
+  newPerDay: number | null
+  /** Review-only days reserved before the exam. */
+  bufferDays: number
+  /** True in the last 7 days before the exam. */
+  finalWeek: boolean
+}
+
+/**
+ * Pace plan for a set exam date: introduce all remaining new items evenly,
+ * finishing a few days early so the run-in is review-only. Indicative only.
+ */
+export function examPlan(
+  examDate: string,
+  totalItems: number,
+  introducedItems: number,
+  now = new Date(),
+): ExamPlan {
+  const end = new Date(`${examDate}T00:00:00`)
+  const start = new Date(now)
+  start.setHours(0, 0, 0, 0)
+  const daysLeft = Math.round((end.getTime() - start.getTime()) / 86400000)
+  const unseen = Math.max(0, totalItems - introducedItems)
+  const bufferDays = daysLeft > 10 ? 3 : daysLeft > 5 ? 2 : daysLeft > 2 ? 1 : 0
+  const studyDays = Math.max(1, daysLeft - bufferDays)
+  const newPerDay = daysLeft <= 0 ? null : Math.ceil(unseen / studyDays)
+  return { daysLeft, unseen, newPerDay, bufferDays, finalWeek: daysLeft > 0 && daysLeft <= 7 }
+}
+
 export interface ReadinessProjection {
   ratePerDay: number
   daysToTarget: number | null

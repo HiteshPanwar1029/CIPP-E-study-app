@@ -6,13 +6,16 @@ import { dueCount } from '../lib/stats'
 import { DOMAINS } from '../lib/blueprint'
 import type { DomainId, BloomLevel } from '../lib/blueprint'
 import type { MockForm, StudyItem } from '../lib/types'
+import { CONFUSION_PAIRS } from '../data/confusionPairs'
 import { DrillRunner } from '../session/DrillRunner'
 import { MockRunner } from '../session/MockRunner'
+import { PairRunner, pairRound, mixedRound, type PairPrompt } from '../session/PairRunner'
 import { PageHeader, Card } from '../components/ui'
 
 type Active =
   | { kind: 'drill'; queue: StudyItem[] }
   | { kind: 'mock'; form: MockForm; focusDomain?: DomainId }
+  | { kind: 'pairs'; queue: PairPrompt[]; title: string }
 
 const selectCls = 'mt-1 w-full rounded-md border border-border bg-surface px-2 py-1.5 text-sm'
 
@@ -21,6 +24,7 @@ export function Session() {
   const items = useStore((s) => s.items)
   const srs = useStore((s) => s.srs)
   const reviews = useStore((s) => s.reviews)
+  const pairStats = useStore((s) => s.pairStats)
 
   const [active, setActive] = useState<Active | null>(null)
   const [domain, setDomain] = useState<DomainId | ''>('')
@@ -55,6 +59,13 @@ export function Session() {
           focusDomain={active.focusDomain}
           onFinish={(id) => navigate(`/results?mock=${id}`)}
         />
+      </div>
+    )
+  }
+  if (active?.kind === 'pairs') {
+    return (
+      <div className="mx-auto max-w-2xl">
+        <PairRunner queue={active.queue} title={active.title} onExit={() => setActive(null)} />
       </div>
     )
   }
@@ -124,6 +135,47 @@ export function Session() {
           >
             Due only ({due})
           </button>
+        </div>
+      </Card>
+
+      <Card className="mb-4">
+        <h2 className="mb-1 text-sm font-semibold">Confusion pairs</h2>
+        <p className="mb-4 text-xs text-muted">
+          Rapid discrimination rounds on classically confused concepts — press 1 or 2 to answer.
+          Weak pairs surface more often in mixed rounds.
+        </p>
+        <button
+          onClick={() =>
+            setActive({
+              kind: 'pairs',
+              queue: mixedRound(CONFUSION_PAIRS, pairStats),
+              title: 'Mixed round',
+            })
+          }
+          className="mb-4 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-accent-fg"
+        >
+          Mixed round · 12
+        </button>
+        <div className="flex flex-wrap gap-1.5">
+          {CONFUSION_PAIRS.map((p) => {
+            const s = pairStats[p.id]
+            const pct = s && s.attempts > 0 ? Math.round((s.correct / s.attempts) * 100) : null
+            return (
+              <button
+                key={p.id}
+                onClick={() =>
+                  setActive({ kind: 'pairs', queue: pairRound(p), title: `${p.a} vs ${p.b}` })
+                }
+                title={p.contrast}
+                className="rounded-md border border-border px-2.5 py-1 text-xs hover:border-accent"
+              >
+                {p.a} vs {p.b}
+                <span className={'ml-1.5 tabular-nums ' + (pct !== null && pct < 80 ? 'text-danger' : 'text-muted')}>
+                  {pct !== null ? `${pct}%` : '—'}
+                </span>
+              </button>
+            )
+          })}
         </div>
       </Card>
 

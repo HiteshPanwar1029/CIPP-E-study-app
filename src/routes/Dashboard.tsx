@@ -12,6 +12,7 @@ import {
   confidentlyWrong,
   competencyCoverage,
   readinessProjection,
+  examPlan,
 } from '../lib/stats'
 import { PageHeader, Card, Meter } from '../components/ui'
 import { DueLoadChart } from '../components/charts'
@@ -22,6 +23,8 @@ const TOTAL_COMPS = DOMAINS.reduce((n, d) => n + d.competencies.length, 0)
 export function Dashboard() {
   const reviews = useStore((s) => s.reviews)
   const srs = useStore((s) => s.srs)
+  const settings = useStore((s) => s.settings)
+  const items = useStore((s) => s.items)
   const srsArr = Object.values(srs)
 
   const dom = byDomain(reviews)
@@ -36,6 +39,9 @@ export function Dashboard() {
   const covCounts = { untouched: 0, seen: 0, mastered: 0 }
   for (const d of DOMAINS) for (const c of d.competencies) covCounts[cov[c.id].status]++
   const proj = readinessProjection(reviews)
+
+  const plan = settings.examDate ? examPlan(settings.examDate, items.length, srsArr.length) : null
+  const suggestLowerRetention = !!plan && plan.finalWeek && settings.targetRetention > 0.86
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -53,6 +59,58 @@ export function Dashboard() {
         <Card><Stat value={String(reviews.length)} label="Reviews logged" /></Card>
         <Card><Stat value={String(streak(reviews))} label="Day streak" /></Card>
       </div>
+
+      <Card className="mb-6">
+        <div className="mb-1 flex items-center justify-between">
+          <h2 className="text-sm font-semibold">Exam plan</h2>
+          <Link to="/settings" className="text-xs text-accent hover:underline">
+            {settings.examDate ? 'Change date →' : 'Set exam date →'}
+          </Link>
+        </div>
+        {!plan ? (
+          <p className="text-xs text-muted">
+            Set your exam date in Settings and a daily pace plan appears here.
+          </p>
+        ) : plan.daysLeft < 0 ? (
+          <p className="text-sm text-muted">
+            Your exam date has passed — update it in Settings to keep planning.
+          </p>
+        ) : plan.daysLeft === 0 ? (
+          <p className="text-sm">
+            Exam day. No new material — clear the due queue and skim your confidently-wrong list.
+            Good luck.
+          </p>
+        ) : (
+          <>
+            <p className="text-sm">
+              <span className="font-semibold tabular-nums">{plan.daysLeft}</span> day
+              {plan.daysLeft === 1 ? '' : 's'} to{' '}
+              {new Date(`${settings.examDate}T00:00:00`).toLocaleDateString(undefined, {
+                month: 'long',
+                day: 'numeric',
+              })}
+              {plan.unseen === 0 ? (
+                <> — all {items.length} items introduced. Review-only from here: keep the due queue at zero.</>
+              ) : (
+                <>
+                  {' '}
+                  — {plan.unseen} of {items.length} items not yet introduced. Learn{' '}
+                  <span className="font-semibold">~{plan.newPerDay} new/day</span>
+                  {plan.bufferDays > 0 &&
+                    ` to finish ${plan.bufferDays} day${plan.bufferDays === 1 ? '' : 's'} early for a review-only run-in`}
+                  .
+                </>
+              )}
+            </p>
+            {suggestLowerRetention && (
+              <p className="mt-2 text-xs text-muted">
+                Final week: consider lowering target retention to ~85% in Settings — wider intervals,
+                more breadth before exam day.
+              </p>
+            )}
+          </>
+        )}
+      </Card>
 
       <Card className="mb-6">
         <div className="mb-4 flex items-center justify-between">

@@ -67,6 +67,19 @@ export function Settings() {
 
       <Card>
         <Row
+          title="Exam date"
+          desc="Drives the dashboard planner: daily pace for new material, review-only run-in."
+        >
+          <input
+            type="date"
+            value={settings.examDate ?? ''}
+            onChange={(e) => updateSettings({ examDate: e.target.value || undefined })}
+            aria-label="Exam date"
+            className="rounded-md border border-border bg-surface px-2 py-1.5 text-sm"
+          />
+        </Row>
+        <hr className="my-1 border-border" />
+        <Row
           title="Target retention"
           desc="FSRS schedules each review for this predicted recall. Lower it (~85%) in the final week to widen intervals."
         >

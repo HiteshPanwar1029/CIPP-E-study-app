@@ -156,3 +156,70 @@ Honest self-review against spec §5/§7 surfaced four gaps; built all in one pas
 | D31 | Mobile navigation | Leave sidebar hidden vs add bottom nav | **Fixed bottom tab bar (`sm:hidden`)** | On phones the sidebar was hidden with no replacement, leaving Reference/Settings unreachable. Bottom bar makes the "study on the go" PWA use case work; sidebar still used on ≥640px. Safe-area padding for notched phones; content gets extra bottom padding so the bar never overlaps. |
 
 Verification: `npm run build` pass; `npm run test` 15/15. Delivered to `src/components/Layout.tsx`. README gained a "Use it on your phone" section.
+
+---
+
+## 2026-07-08 — Learning-optimisation trio (pairs, pacing, planner)
+
+| # | Decision | Options | Chosen | Why |
+|---|----------|---------|--------|-----|
+| D32 | Confusion-pair drills | Log into review log vs separate stats | **New `pairs` Dexie table (schema v2) + `PairStat` per pair** | Binary discrimination prompts would inflate competency accuracy if logged as reviews. Separate lifetime accuracy per pair keeps analytics honest; mixed rounds bias toward the weakest pairs. |
+| D33 | Pair content | Generate at runtime vs author | **10 authored pairs × 6 prompts (60)** in `src/data/confusionPairs.ts` | High-yield classic traps: EDPB/EDPS, SCC/BCR, Art. 33/34, controller/processor, 108/108+, erasure/restriction, GDPR/ePrivacy, adequacy/safeguards, objection/withdrawal, DPIA/prior consultation. Content-integrity test enforces tags + both sides exercised. |
+| D34 | Mock pacing | Live per-second bar vs coarse chip | **Pace chip (on pace / ≈N behind / ≈N ahead) + per-question ms in `MockAttempt.timings`** | Chip is glanceable without being anxiety-inducing; timings power a Results pacing section (avg s/q vs budget, 5 slowest with ✓/✗). Mock misses now carry real `elapsedMs` into the review log. |
+| D35 | Exam-date planner | Full scheduler vs simple pace | **`stats.examPlan`: even new-items/day with review-only buffer (3/2/1/0 days by runway)** | Honest and predictable; Dashboard card shows countdown, unseen count, ~new/day; suggests ~85% retention in the final week (spec §4.1). `Settings.examDate` optional — planner is opt-in. |
+
+### Built / edited
+- New: `src/data/confusionPairs.ts` (+test), `src/session/PairRunner.tsx`, `src/lib/stats.test.ts`.
+- `src/lib/types.ts` — `ConfusionPair`/`PairItem`/`PairStat`, `MockAttempt.timings`, `Settings.examDate`.
+- `src/lib/db.ts` — Dexie v2 (`pairs` table); export bundle v2 (backwards-compatible import); resets clear pairs.
+- `src/lib/store.ts` — `pairStats` + `recordPairAnswer`.
+- `src/routes/Session.tsx` — Confusion pairs card (mixed round + per-pair rounds with accuracy chips).
+- `src/session/MockRunner.tsx` — per-question timing, pace chip, real elapsedMs on grading.
+- `src/routes/Results.tsx` — Pacing section on mock results (guarded for pre-v2 attempts).
+- `src/lib/stats.ts` — `examPlan`; `src/routes/Settings.tsx` — exam-date row; `src/routes/Dashboard.tsx` — Exam plan card.
+
+Verification: `npm run build` pass; `npm run test` 24/24.
+
+---
+
+## 2026-07-08 — AI & Governance combined module (user request)
+
+| # | Decision | Options | Chosen | Why |
+|---|----------|---------|--------|-----|
+| D36 | Where the module lives | Merge into blueprint pool vs self-contained | **Self-contained `/aigov` route + `moduleStats` Dexie table (schema v3)** | Much of the material (NIST AI RMF, ISO 42001, ethics frameworks) is beyond the CIPP/E blueprint; feeding it into drills/mocks/readiness would distort exam-faithful analytics. Section accuracy tracked separately; entry card on Learn. |
+| D37 | AI Act timeline content | Regulation-as-adopted vs current | **Current (verified by web search)**: June 2026 digital-omnibus adopted — Annex III high-risk → 2 Dec 2027, Annex I embedded → 2 Aug 2028 | Study material should match the law as it stands; noted in the section summary and PROGRESS. |
+
+### Built / edited
+- New: `src/data/aiGov.ts` (5 sections × teaching note + key points; 30 original questions, recall+applied mix; +`aiGov.test.ts`), `src/routes/AiGov.tsx` (section list → note → quiz; reuses `QuestionView`; keyboard-first).
+- `src/lib/types.ts` — `ModuleStat`; `src/lib/db.ts` — Dexie v3 `moduleStats`, export bundle v3 (older backups import fine); `src/lib/store.ts` — `moduleStats` + `recordModuleAnswer`; resets clear module stats.
+- `src/main.tsx` — `/aigov` route; `src/routes/Learn.tsx` — module entry card.
+- Sections: EU AI Act (risk tiers, GPAI, provider/deployer, fines, omnibus timeline); GDPR × AI (Art. 22, SCHUFA, EDPB Op. 28/2024, LI necessity, hallucination/accuracy); AI Ethics Frameworks (HLEG 7, OECD, UNESCO); DPIA Methodology (Art. 35(3), WP248 2-of-9, Art. 35(7), Art. 36, FRIA link); AI Governance Frameworks (NIST RMF, ISO 42001/23894, CoE Convention, org building blocks).
+
+### Process note
+The workspace mount served stale/truncated bash reads of several overwritten files (Learn.tsx, store.ts, db.ts, types.ts, main.tsx) — real files on Windows were correct (file tools authoritative). Verified by reconstructing those files in the sandbox build dir; `iflag=direct` confirmed the staleness is server-side, not page cache.
+
+Verification: `npm run build` pass; `npm run test` 29/29.
+
+---
+
+## 2026-07-08 — NIST AI RMF + ISO/IEC 42001 deep dives (user request)
+
+| # | Decision | Options | Chosen | Why |
+|---|----------|---------|--------|-----|
+| D38 | Where deep dives live | Expand umbrella section vs dedicated sections | **Two new sections in `data/aiGov.ts`** (`ag_nist`, `ag_iso42001`), 6 questions each | The umbrella "AI Governance Frameworks" section stays as the survey; deep dives go further (TEVV, GenAI Profile 600-1, Annex SL clauses, 38 Annex A controls, SoA, cert mechanics). Cross-framework confusion baked into distractors (RMF functions vs Annex SL vs risk pyramid vs trustworthiness list). |
+
+Facts verified by web search: ISO/IEC 42005:2025 (impact assessment) and 42006:2025 (cert-body requirements) both published. Module now 7 sections / 42 questions; test tightened to `toBe(7)`, ≥40 questions. Verification: build pass, tests 29/29.
+
+---
+
+## 2026-07-15 — AI & Gov module deepened: case files + scenario questions (user request)
+
+| # | Decision | Options | Chosen | Why |
+|---|----------|---------|--------|-----|
+| D39 | Adding real-world depth | Fictional vignettes vs researched cases | **14 researched case files** (2/section, `facts` + `lesson` fields, rendered as a "Case files" card) + 20 new apply/analyze questions grounded in them (42 → 62) | User asked for analytical depth, deep-knowledge testing and live examples. Cases verified by web search: Clearview (~€100m GDPR fines; conduct now Art. 5-prohibited), Garante v OpenAI (€15m, annulled 3/2026 on one-stop-shop), Meta training pause/resume + EDPB 7/2026 training-data guidelines, Amazon scrapped recruiter (proxy bias), toeslagenaffaire (€2.75m fine, government fell) + SyRI, Deliveroo "Frank" (€2.5m incl. missing-DPIA violation), Air Canada chatbot (tribunal: company owns bot output), ISO 42001 wave (AWS 11/2024, Anthropic 1/2025, Microsoft Copilots, 350+ certs; 42006 professionalises auditors). |
+| D40 | Test tightening | Keep loose vs enforce depth | `aiGov.test.ts` now requires ≥2 case studies/section (substantive facts+lesson), ≥8 questions/section, ≥60 total, ≥3 applied-tier per section | Locks in the analytical mix against future edits. |
+
+### Process note
+Mount again served stale/truncated bash reads of freshly edited files (aiGov.ts, AiGov.tsx, aiGov.test.ts); real files verified correct via file tools. Sandbox copies reconstructed by heredoc for verification. Also: workspace restart cleared /tmp — reinstalled node_modules.
+
+Verification: `npm run build` pass; `npm run test` 29/29 (62 module questions).

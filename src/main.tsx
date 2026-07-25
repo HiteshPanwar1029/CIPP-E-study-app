@@ -5,6 +5,7 @@ import './index.css'
 import { Layout } from './components/Layout'
 import { Dashboard } from './routes/Dashboard'
 import { Learn } from './routes/Learn'
+import { AiGov } from './routes/AiGov'
 import { Session } from './routes/Session'
 import { Results } from './routes/Results'
 import { Reference } from './routes/Reference'
@@ -20,6 +21,7 @@ const router = createBrowserRouter(
       children: [
         { index: true, element: <Dashboard /> },
         { path: 'learn', element: <Learn /> },
+        { path: 'aigov', element: <AiGov /> },
         { path: 'session', element: <Session /> },
         { path: 'results', element: <Results /> },
         { path: 'reference', element: <Reference /> },

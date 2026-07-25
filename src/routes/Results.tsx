@@ -3,7 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { useStore } from '../lib/store'
 import { DOMAINS, BLOOMS } from '../lib/blueprint'
 import { confidentlyWrong, latestPerItem } from '../lib/stats'
-import { sameSet } from '../lib/mock'
+import { sameSet, FORM_MINUTES } from '../lib/mock'
 import type { Question, StudyItem } from '../lib/types'
 import { PageHeader, Card, Meter, Chip } from '../components/ui'
 
@@ -111,6 +111,18 @@ export function Results() {
             Indicative readiness for this form: {Math.round(mock.readinessEstimate * 100)}% — not a
             pass guarantee. Missed items were queued into your reviews.
           </p>
+          {mock.timings && Object.keys(mock.timings).length > 0 && (
+            <Pacing
+              timings={mock.timings}
+              count={mock.questionIds.length}
+              budgetSec={(FORM_MINUTES[mock.form] * 60) / mock.questionIds.length}
+              stemOf={(id) => getQ(id)?.stem ?? id}
+              wasCorrect={(id) => {
+                const q = getQ(id)
+                return !!q && sameSet(mock.answers[id] ?? [], q.correct)
+              }}
+            />
+          )}
           <details className="mt-4">
             <summary className="cursor-pointer text-sm font-medium">Review missed questions</summary>
             <div className="mt-3 space-y-3">
@@ -220,6 +232,58 @@ export function Results() {
           </p>
         </Card>
       )}
+    </div>
+  )
+}
+
+function Pacing({
+  timings,
+  count,
+  budgetSec,
+  stemOf,
+  wasCorrect,
+}: {
+  timings: Record<string, number>
+  count: number
+  budgetSec: number
+  stemOf: (id: string) => string
+  wasCorrect: (id: string) => boolean
+}) {
+  const entries = Object.entries(timings).filter(([, ms]) => ms > 0)
+  if (entries.length === 0) return null
+  const totalMs = entries.reduce((s, [, ms]) => s + ms, 0)
+  const avgSec = totalMs / entries.length / 1000
+  const slowest = [...entries].sort((a, b) => b[1] - a[1]).slice(0, 5)
+  return (
+    <div className="mt-4 border-t border-border pt-4">
+      <div className="mb-2 flex items-baseline justify-between">
+        <h3 className="text-xs font-semibold text-muted">Pacing</h3>
+        <span className="text-xs tabular-nums text-muted">
+          avg {avgSec.toFixed(0)}s / question · budget {Math.round(budgetSec)}s ({count} items)
+        </span>
+      </div>
+      <div className="space-y-1">
+        {slowest.map(([id, ms]) => (
+          <div key={id} className="flex items-center gap-2 text-xs">
+            <span
+              className={
+                'w-12 shrink-0 text-right tabular-nums ' +
+                (ms / 1000 > budgetSec * 1.5 ? 'text-danger' : 'text-muted')
+              }
+            >
+              {(ms / 1000).toFixed(0)}s
+            </span>
+            <span className={wasCorrect(id) ? 'text-accent' : 'text-danger'}>
+              {wasCorrect(id) ? '✓' : '✗'}
+            </span>
+            <span className="min-w-0 truncate text-muted">{stemOf(id)}</span>
+          </div>
+        ))}
+      </div>
+      <p className="mt-2 text-xs text-muted">
+        Your five slowest questions. Slow + wrong is the pattern to train: drill that competency
+        until the reasoning is faster.
+      </p>
     </div>
   )
 }

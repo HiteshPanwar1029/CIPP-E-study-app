@@ -6,6 +6,8 @@ import type {
   ItemMeta,
   Settings,
   Question,
+  PairStat,
+  ModuleStat,
 } from './types'
 
 // Local-first store. Authored content ships in the bundle (src/data); this DB
@@ -18,6 +20,8 @@ export class CippeDB extends Dexie {
   meta!: Table<ItemMeta, string>
   settings!: Table<Settings, string>
   customQuestions!: Table<Question, string>
+  pairs!: Table<PairStat, string>
+  moduleStats!: Table<ModuleStat, string>
 
   constructor() {
     super('cippe')
@@ -30,6 +34,14 @@ export class CippeDB extends Dexie {
       meta: 'itemId, flagged',
       settings: 'key',
       customQuestions: 'id, competency, domain',
+    })
+    // v2 — confusion-pair accuracy stats.
+    this.version(2).stores({
+      pairs: 'pairId',
+    })
+    // v3 — AI & Governance module section stats.
+    this.version(3).stores({
+      moduleStats: 'sectionId',
     })
   }
 }
@@ -61,20 +73,27 @@ export interface ExportBundle {
   meta: ItemMeta[]
   settings: Settings[]
   customQuestions: Question[]
+  /** Added in bundle v2 — absent from older backups. */
+  pairs?: PairStat[]
+  /** Added in bundle v3 — absent from older backups. */
+  moduleStats?: ModuleStat[]
 }
 
 export async function exportAll(): Promise<ExportBundle> {
-  const [srs, reviews, mocks, meta, settings, customQuestions] = await Promise.all([
-    db.srs.toArray(),
-    db.reviews.toArray(),
-    db.mocks.toArray(),
-    db.meta.toArray(),
-    db.settings.toArray(),
-    db.customQuestions.toArray(),
-  ])
+  const [srs, reviews, mocks, meta, settings, customQuestions, pairs, moduleStats] =
+    await Promise.all([
+      db.srs.toArray(),
+      db.reviews.toArray(),
+      db.mocks.toArray(),
+      db.meta.toArray(),
+      db.settings.toArray(),
+      db.customQuestions.toArray(),
+      db.pairs.toArray(),
+      db.moduleStats.toArray(),
+    ])
   return {
     app: 'cippe',
-    version: 1,
+    version: 3,
     exportedAt: new Date().toISOString(),
     srs,
     reviews,
@@ -82,6 +101,8 @@ export async function exportAll(): Promise<ExportBundle> {
     meta,
     settings,
     customQuestions,
+    pairs,
+    moduleStats,
   }
 }
 
@@ -89,7 +110,7 @@ export async function importAll(bundle: ExportBundle): Promise<void> {
   if (bundle?.app !== 'cippe') throw new Error('Not a CIPP/E Prep backup file.')
   await db.transaction(
     'rw',
-    [db.srs, db.reviews, db.mocks, db.meta, db.settings, db.customQuestions],
+    [db.srs, db.reviews, db.mocks, db.meta, db.settings, db.customQuestions, db.pairs, db.moduleStats],
     async () => {
       await Promise.all([
         db.srs.clear(),
@@ -98,6 +119,8 @@ export async function importAll(bundle: ExportBundle): Promise<void> {
         db.meta.clear(),
         db.settings.clear(),
         db.customQuestions.clear(),
+        db.pairs.clear(),
+        db.moduleStats.clear(),
       ])
       await db.srs.bulkAdd(bundle.srs ?? [])
       await db.reviews.bulkAdd(bundle.reviews ?? [])
@@ -105,11 +128,20 @@ export async function importAll(bundle: ExportBundle): Promise<void> {
       await db.meta.bulkAdd(bundle.meta ?? [])
       await db.settings.bulkAdd(bundle.settings ?? [])
       await db.customQuestions.bulkAdd(bundle.customQuestions ?? [])
+      await db.pairs.bulkAdd(bundle.pairs ?? [])
+      await db.moduleStats.bulkAdd(bundle.moduleStats ?? [])
     },
   )
 }
 
 /** Clears study progress but keeps settings. */
 export async function resetProgress(): Promise<void> {
-  await Promise.all([db.srs.clear(), db.reviews.clear(), db.mocks.clear(), db.meta.clear()])
+  await Promise.all([
+    db.srs.clear(),
+    db.reviews.clear(),
+    db.mocks.clear(),
+    db.meta.clear(),
+    db.pairs.clear(),
+    db.moduleStats.clear(),
+  ])
 }

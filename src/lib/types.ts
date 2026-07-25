@@ -101,6 +101,8 @@ export interface MockAttempt {
   focusDomain?: DomainId
   questionIds: string[]
   answers: Record<string, string[]>
+  /** Milliseconds spent on each question (summed across visits). Absent on pre-pacing attempts. */
+  timings?: Record<string, number>
   scoreByDomain: Record<string, number>
   scoreByBloom: Record<string, number>
   overall: number
@@ -117,4 +119,48 @@ export interface ItemMeta {
 export interface Settings {
   key: string
   targetRetention: number
+  /** ISO date (yyyy-mm-dd) of the exam, if set — drives the dashboard planner. */
+  examDate?: string
+}
+
+// ── Confusion pairs — rapid discrimination training ─────────────────────────
+
+export interface PairItem {
+  prompt: string
+  answer: 'a' | 'b'
+  /** Optional extra discriminator shown after answering (falls back to the pair contrast). */
+  note?: string
+}
+
+export interface ConfusionPair {
+  id: string
+  a: string
+  b: string
+  domain: DomainId
+  competency: string
+  /** One-line discriminator between the two concepts. */
+  contrast: string
+  items: PairItem[]
+}
+
+/** Per-pair lifetime accuracy, persisted in IndexedDB. */
+export interface PairStat {
+  pairId: string
+  attempts: number
+  correct: number
+  lastTs?: string
+}
+
+// ── AI & Governance module — self-contained extra-curricular section ─────────
+
+/**
+ * Per-section lifetime accuracy for the AI & Governance module. Kept separate
+ * from the review log on purpose: module questions must not skew the
+ * blueprint-weighted readiness and domain analytics.
+ */
+export interface ModuleStat {
+  sectionId: string
+  attempts: number
+  correct: number
+  lastTs?: string
 }

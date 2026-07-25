@@ -10,6 +10,8 @@ import type {
   StudyMode,
   Question,
   StudyItem,
+  PairStat,
+  ModuleStat,
 } from './types'
 import { review as srsReview, newState } from './srs'
 import { STUDY_ITEMS } from '../data'
@@ -30,10 +32,14 @@ interface StoreState {
   meta: Record<string, ItemMeta>
   reviews: ReviewLogEntry[]
   mocks: MockAttempt[]
+  pairStats: Record<string, PairStat>
+  moduleStats: Record<string, ModuleStat>
   items: StudyItem[]
   byId: Record<string, StudyItem>
   init: () => Promise<void>
   gradeItem: (a: GradeArgs) => Promise<void>
+  recordPairAnswer: (pairId: string, correct: boolean) => Promise<void>
+  recordModuleAnswer: (sectionId: string, correct: boolean) => Promise<void>
   setFlag: (itemId: string, flagged: boolean) => Promise<void>
   requeue: (itemId: string) => Promise<void>
   updateSettings: (patch: Partial<Settings>) => Promise<void>
@@ -55,27 +61,71 @@ export const useStore = create<StoreState>((set, get) => ({
   meta: {},
   reviews: [],
   mocks: [],
+  pairStats: {},
+  moduleStats: {},
   items: STUDY_ITEMS,
   byId: indexItems(STUDY_ITEMS),
 
   init: async () => {
-    const [settings, srsArr, metaArr, reviews, mocks, custom] = await Promise.all([
-      getSettings(),
-      db.srs.toArray(),
-      db.meta.toArray(),
-      db.reviews.toArray(),
-      db.mocks.toArray(),
-      db.customQuestions.toArray(),
-    ])
+    const [settings, srsArr, metaArr, reviews, mocks, custom, pairArr, moduleArr] =
+      await Promise.all([
+        getSettings(),
+        db.srs.toArray(),
+        db.meta.toArray(),
+        db.reviews.toArray(),
+        db.mocks.toArray(),
+        db.customQuestions.toArray(),
+        db.pairs.toArray(),
+        db.moduleStats.toArray(),
+      ])
     const srs: Record<string, SrsState> = {}
     for (const s of srsArr) srs[s.itemId] = s
     const meta: Record<string, ItemMeta> = {}
     for (const m of metaArr) meta[m.itemId] = m
+    const pairStats: Record<string, PairStat> = {}
+    for (const p of pairArr) pairStats[p.pairId] = p
+    const moduleStats: Record<string, ModuleStat> = {}
+    for (const m of moduleArr) moduleStats[m.sectionId] = m
     const items: StudyItem[] = [
       ...STUDY_ITEMS,
       ...custom.map((q) => ({ kind: 'question' as const, ...q })),
     ]
-    set({ ready: true, settings, srs, meta, reviews, mocks, items, byId: indexItems(items) })
+    set({
+      ready: true,
+      settings,
+      srs,
+      meta,
+      reviews,
+      mocks,
+      pairStats,
+      moduleStats,
+      items,
+      byId: indexItems(items),
+    })
+  },
+
+  recordPairAnswer: async (pairId, correct) => {
+    const cur = get().pairStats[pairId] ?? { pairId, attempts: 0, correct: 0 }
+    const next: PairStat = {
+      ...cur,
+      attempts: cur.attempts + 1,
+      correct: cur.correct + (correct ? 1 : 0),
+      lastTs: new Date().toISOString(),
+    }
+    await db.pairs.put(next)
+    set((st) => ({ pairStats: { ...st.pairStats, [pairId]: next } }))
+  },
+
+  recordModuleAnswer: async (sectionId, correct) => {
+    const cur = get().moduleStats[sectionId] ?? { sectionId, attempts: 0, correct: 0 }
+    const next: ModuleStat = {
+      ...cur,
+      attempts: cur.attempts + 1,
+      correct: cur.correct + (correct ? 1 : 0),
+      lastTs: new Date().toISOString(),
+    }
+    await db.moduleStats.put(next)
+    set((st) => ({ moduleStats: { ...st.moduleStats, [sectionId]: next } }))
   },
 
   gradeItem: async ({ itemId, grade, correct, confidence, mode, elapsedMs }) => {
@@ -139,7 +189,14 @@ export const useStore = create<StoreState>((set, get) => ({
   },
 
   resetAll: async () => {
-    await Promise.all([db.srs.clear(), db.reviews.clear(), db.mocks.clear(), db.meta.clear()])
-    set({ srs: {}, meta: {}, reviews: [], mocks: [] })
+    await Promise.all([
+      db.srs.clear(),
+      db.reviews.clear(),
+      db.mocks.clear(),
+      db.meta.clear(),
+      db.pairs.clear(),
+      db.moduleStats.clear(),
+    ])
+    set({ srs: {}, meta: {}, reviews: [], mocks: [], pairStats: {}, moduleStats: {} })
   },
 }))
