@@ -2,7 +2,7 @@ import { useState } from 'react'
 import type { ChangeEvent, ReactNode } from 'react'
 import { useStore } from '../lib/store'
 import { exportAll, importAll, type ExportBundle } from '../lib/db'
-import { PageHeader, Card, ThemeToggle } from '../components/ui'
+import { PageHeader, Card, ThemeToggle, TrackSwitcher } from '../components/ui'
 
 function Row({ title, desc, children }: { title: string; desc: string; children: ReactNode }) {
   return (
@@ -18,6 +18,8 @@ function Row({ title, desc, children }: { title: string; desc: string; children:
 
 export function Settings() {
   const settings = useStore((s) => s.settings)
+  const track = useStore((s) => s.track)
+  const trackDef = useStore((s) => s.trackDef)
   const updateSettings = useStore((s) => s.updateSettings)
   const resetAll = useStore((s) => s.resetAll)
   const [msg, setMsg] = useState('')
@@ -60,6 +62,13 @@ export function Settings() {
       <PageHeader kicker="Settings" title="Settings" />
 
       <Card>
+        <Row
+          title="Certification track"
+          desc="Switches the whole app — content, blueprint, drills, mocks and analytics."
+        >
+          <TrackSwitcher size="sm" />
+        </Row>
+        <hr className="my-1 border-border" />
         <Row title="Appearance" desc="Light, dark, or match your system.">
           <ThemeToggle />
         </Row>
@@ -67,14 +76,18 @@ export function Settings() {
 
       <Card>
         <Row
-          title="Exam date"
-          desc="Drives the dashboard planner: daily pace for new material, review-only run-in."
+          title={`${trackDef.label} exam date`}
+          desc="Drives the dashboard planner: daily pace for new material, review-only run-in. Each track has its own date."
         >
           <input
             type="date"
-            value={settings.examDate ?? ''}
-            onChange={(e) => updateSettings({ examDate: e.target.value || undefined })}
-            aria-label="Exam date"
+            value={settings.examDates?.[track] ?? ''}
+            onChange={(e) =>
+              updateSettings({
+                examDates: { ...settings.examDates, [track]: e.target.value || undefined },
+              })
+            }
+            aria-label={`${trackDef.label} exam date`}
             className="rounded-md border border-border bg-surface px-2 py-1.5 text-sm"
           />
         </Row>

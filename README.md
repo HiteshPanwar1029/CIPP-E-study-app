@@ -1,6 +1,15 @@
-# CIPP/E Prep
+# IAPP Prep — CIPP/E & AIGP
 
-A local-first, single-user study and training web app for the **IAPP CIPP/E** exam, built 1:1 against the official **Body of Knowledge & Exam Blueprint (v1.3.3)**. No login, no server, no API key — everything runs entirely in your browser with zero network calls.
+A local-first, single-user study and training web app for **two IAPP certifications**, each built 1:1
+against its official Body of Knowledge & Exam Blueprint:
+
+- **CIPP/E** — Certified Information Privacy Professional/Europe (BoK v1.3.3)
+- **AIGP** — Artificial Intelligence Governance Professional (BoK v2.1, effective 2 February 2026)
+
+Pick your track from the switcher at the top of the Dashboard and the whole app follows —
+content, blueprint tree, drills, mocks, reference library and analytics. Progress is tracked
+separately per certification. No login, no server, no API key — everything runs entirely in your
+browser with zero network calls.
 
 > **Status:** built and verified. See `PROGRESS.md` for what works and `LOGBOOK.md` for decisions.
 
@@ -18,7 +27,7 @@ Other scripts: `npm run build` (type-check + production build, PWA + code-split)
 ## Features
 
 - **Drill** — adaptive spaced repetition (FSRS via `ts-fsrs`), weighted on both competency mastery and Bloom tier. Keyboard-first: number keys select, Space reveals, 1–4 grade confidence, F flags. Every answer shows an original explanation, why each distractor is wrong, and the governing articles/cases.
-- **Mock exam** — timed, blueprint-weighted forms (full 90 / half 45 / domain-focused), no feedback until submit, then a per-domain and per-Bloom breakdown with an indicative readiness score; misses are auto-queued.
+- **Mock exam** — timed, blueprint-weighted forms sized to the real exam (CIPP/E 90 items/150 min · AIGP 100 items/180 min, plus half and domain-focused forms), no feedback until submit, then a per-domain and per-Bloom breakdown with an indicative readiness score; misses are auto-queued.
 - **Dashboard** — weight-sized domain-mastery bars, recall-vs-applied split, a 14-day due-load chart, streak, a confidently-wrong list, and an honest readiness caption.
 - **Reference** — the full competency tree (18 competencies) with performance indicators and plain-language summaries of the key GDPR articles and CJEU cases.
 - **Settings** — target-retention slider, one-file JSON export/import, and reset.

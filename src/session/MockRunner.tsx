@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { MockForm, Question, StudyItem } from '../lib/types'
 import type { DomainId } from '../lib/blueprint'
 import { useStore } from '../lib/store'
-import { buildMockForm, scoreMock, sameSet, FORM_MINUTES } from '../lib/mock'
+import { buildMockForm, scoreMock, sameSet } from '../lib/mock'
 import { QuestionView } from './QuestionView'
 import { Meter } from '../components/ui'
 
@@ -22,11 +22,14 @@ export function MockRunner({
   const byId = useStore((s) => s.byId)
   const saveMock = useStore((s) => s.saveMock)
   const gradeItem = useStore((s) => s.gradeItem)
+  const trackDef = useStore((s) => s.trackDef)
+  const domains = trackDef.domains
+  const FORM_MINUTES = trackDef.exam.formMinutes
 
   const questionIds = useMemo(() => {
     const questions = items.filter(isQuestion) as Question[]
-    return buildMockForm(questions, form, focusDomain)
-  }, [items, form, focusDomain])
+    return buildMockForm(questions, form, focusDomain, domains, trackDef.exam.formSize)
+  }, [items, form, focusDomain, domains, trackDef])
 
   const startedAt = useMemo(() => new Date().toISOString(), [])
   const [i, setI] = useState(0)
@@ -64,7 +67,7 @@ export function MockRunner({
     setSubmitting(true)
     stamp()
     const timings = { ...timingsRef.current }
-    const score = scoreMock(questionIds, answers, getQ)
+    const score = scoreMock(questionIds, answers, getQ, domains)
     const durationMs = FORM_MINUTES[form] * 60000 - remaining * 1000
     const mockId = await saveMock({
       startedAt,

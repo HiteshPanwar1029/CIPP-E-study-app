@@ -1,5 +1,5 @@
 import type { Question } from '../lib/types'
-import { lawRefsById } from '../data'
+import { ALL_REFS_BY_ID } from '../lib/tracks'
 import { Chip } from '../components/ui'
 
 export function QuestionView({
@@ -21,9 +21,21 @@ export function QuestionView({
         <span>·</span>
         <span className="capitalize">{q.bloomLevel}</span>
         {isMulti && (
-          <span className="rounded bg-surface-2 px-1.5 py-0.5">select all that apply</span>
+          <span className="rounded bg-surface-2 px-1.5 py-0.5">
+            select {q.correct.length} · no partial credit
+          </span>
         )}
       </div>
+      {q.scenario && (
+        <div className="mb-4 rounded-lg border-l-2 border-accent bg-surface-2 px-4 py-3">
+          {q.caseTitle && (
+            <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-accent">
+              Case · {q.caseTitle}
+            </div>
+          )}
+          <p className="text-sm leading-relaxed text-muted">{q.scenario}</p>
+        </div>
+      )}
       <p className="mb-5 text-lg leading-relaxed">{q.stem}</p>
       <div className="space-y-2">
         {q.options.map((o, i) => {
@@ -81,7 +93,7 @@ export function QuestionView({
           {q.lawRefs.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
               {q.lawRefs.map((r) => {
-                const ref = lawRefsById.get(r)
+                const ref = ALL_REFS_BY_ID.get(r)
                 return <Chip key={r}>{ref ? `${ref.instrument} ${ref.citation}` : r}</Chip>
               })}
             </div>

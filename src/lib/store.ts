@@ -14,7 +14,8 @@ import type {
   ModuleStat,
 } from './types'
 import { review as srsReview, newState } from './srs'
-import { STUDY_ITEMS } from '../data'
+import { getTrack, trackOfItem, DEFAULT_TRACK, type TrackDef } from './tracks'
+import type { TrackId } from './types'
 
 interface GradeArgs {
   itemId: string
@@ -28,6 +29,14 @@ interface GradeArgs {
 interface StoreState {
   ready: boolean
   settings: Settings
+  /** Active certification track — everything below is scoped to it. */
+  track: TrackId
+  trackDef: TrackDef
+  /** SRS state for the whole database (all tracks). */
+  allSrs: Record<string, SrsState>
+  allReviews: ReviewLogEntry[]
+  allMocks: MockAttempt[]
+  /** Views filtered to the active track — what every screen consumes. */
   srs: Record<string, SrsState>
   meta: Record<string, ItemMeta>
   reviews: ReviewLogEntry[]
@@ -36,6 +45,7 @@ interface StoreState {
   moduleStats: Record<string, ModuleStat>
   items: StudyItem[]
   byId: Record<string, StudyItem>
+  setTrack: (t: TrackId) => Promise<void>
   init: () => Promise<void>
   gradeItem: (a: GradeArgs) => Promise<void>
   recordPairAnswer: (pairId: string, correct: boolean) => Promise<void>
@@ -54,17 +64,56 @@ function indexItems(items: StudyItem[]): Record<string, StudyItem> {
   return o
 }
 
+/** A review/mock row belongs to the track it was tagged with; legacy rows fall
+ *  back to the item's own track, then to CIPP/E. */
+const rowTrack = (row: { track?: TrackId; itemId?: string }): TrackId =>
+  row.track ?? (row.itemId ? (trackOfItem(row.itemId) ?? DEFAULT_TRACK) : DEFAULT_TRACK)
+
+/** Recompute every track-scoped view from the full dataset. */
+function scopeToTrack(
+  track: TrackId,
+  allSrs: Record<string, SrsState>,
+  allReviews: ReviewLogEntry[],
+  allMocks: MockAttempt[],
+  custom: StudyItem[] = [],
+) {
+  const def = getTrack(track)
+  const items: StudyItem[] = [
+    ...def.items,
+    // Custom (imported) items have no built-in track mapping; keep unmapped
+    // ones visible in whichever track is active rather than losing them.
+    ...custom.filter((c) => (trackOfItem(c.id) ?? track) === track),
+  ]
+  const byId = indexItems(items)
+  const srs: Record<string, SrsState> = {}
+  for (const [id, st] of Object.entries(allSrs)) if (byId[id]) srs[id] = st
+  return {
+    track,
+    trackDef: def,
+    items,
+    byId,
+    srs,
+    reviews: allReviews.filter((r) => rowTrack(r) === track),
+    mocks: allMocks.filter((m) => (m.track ?? DEFAULT_TRACK) === track),
+  }
+}
+
 export const useStore = create<StoreState>((set, get) => ({
   ready: false,
   settings: { key: 'app', targetRetention: 0.9 },
+  track: DEFAULT_TRACK,
+  trackDef: getTrack(DEFAULT_TRACK),
+  allSrs: {},
+  allReviews: [],
+  allMocks: [],
   srs: {},
   meta: {},
   reviews: [],
   mocks: [],
   pairStats: {},
   moduleStats: {},
-  items: STUDY_ITEMS,
-  byId: indexItems(STUDY_ITEMS),
+  items: getTrack(DEFAULT_TRACK).items,
+  byId: indexItems(getTrack(DEFAULT_TRACK).items),
 
   init: async () => {
     const [settings, srsArr, metaArr, reviews, mocks, custom, pairArr, moduleArr] =
@@ -78,29 +127,37 @@ export const useStore = create<StoreState>((set, get) => ({
         db.pairs.toArray(),
         db.moduleStats.toArray(),
       ])
-    const srs: Record<string, SrsState> = {}
-    for (const s of srsArr) srs[s.itemId] = s
+    const allSrs: Record<string, SrsState> = {}
+    for (const s of srsArr) allSrs[s.itemId] = s
     const meta: Record<string, ItemMeta> = {}
     for (const m of metaArr) meta[m.itemId] = m
     const pairStats: Record<string, PairStat> = {}
     for (const p of pairArr) pairStats[p.pairId] = p
     const moduleStats: Record<string, ModuleStat> = {}
     for (const m of moduleArr) moduleStats[m.sectionId] = m
-    const items: StudyItem[] = [
-      ...STUDY_ITEMS,
-      ...custom.map((q) => ({ kind: 'question' as const, ...q })),
-    ]
+    const customItems: StudyItem[] = custom.map((q) => ({ kind: 'question' as const, ...q }))
+    const track = settings.activeTrack ?? DEFAULT_TRACK
     set({
       ready: true,
       settings,
-      srs,
       meta,
-      reviews,
-      mocks,
       pairStats,
       moduleStats,
-      items,
-      byId: indexItems(items),
+      allSrs,
+      allReviews: reviews,
+      allMocks: mocks,
+      ...scopeToTrack(track, allSrs, reviews, mocks, customItems),
+    })
+  },
+
+  setTrack: async (next) => {
+    const { allSrs, allReviews, allMocks, settings, items, trackDef } = get()
+    const custom = items.filter((i) => !trackDef.items.some((t) => t.id === i.id))
+    const nextSettings: Settings = { ...settings, activeTrack: next, key: 'app' }
+    await db.settings.put(nextSettings)
+    set({
+      settings: nextSettings,
+      ...scopeToTrack(next, allSrs, allReviews, allMocks, custom),
     })
   },
 
@@ -145,13 +202,17 @@ export const useStore = create<StoreState>((set, get) => ({
       domain: item.domain,
       competency: item.competency,
       bloomLevel: item.bloomLevel,
+      track: trackOfItem(itemId) ?? get().track,
     }
     const id = (await db.reviews.add(entry)) as number
     const m: ItemMeta = { ...(meta[itemId] ?? { itemId }), itemId, seen: true }
     await db.meta.put(m)
     set((st) => ({
+      allSrs: { ...st.allSrs, [itemId]: next },
       srs: { ...st.srs, [itemId]: next },
-      reviews: [...st.reviews, { ...entry, id }],
+      allReviews: [...st.allReviews, { ...entry, id }],
+      reviews:
+        (entry.track ?? DEFAULT_TRACK) === st.track ? [...st.reviews, { ...entry, id }] : st.reviews,
       meta: { ...st.meta, [itemId]: m },
     }))
   },
@@ -167,7 +228,10 @@ export const useStore = create<StoreState>((set, get) => ({
     const nowIso = new Date().toISOString()
     const next: SrsState = cur ? { ...cur, due: nowIso } : { ...newState(itemId), due: nowIso }
     await db.srs.put(next)
-    set((st) => ({ srs: { ...st.srs, [itemId]: next } }))
+    set((st) => ({
+      allSrs: { ...st.allSrs, [itemId]: next },
+      srs: { ...st.srs, [itemId]: next },
+    }))
   },
 
   updateSettings: async (patch) => {
@@ -177,8 +241,13 @@ export const useStore = create<StoreState>((set, get) => ({
   },
 
   saveMock: async (mock) => {
-    const id = (await db.mocks.add(mock)) as number
-    set((st) => ({ mocks: [...st.mocks, { ...mock, id }] }))
+    const tagged: MockAttempt = { ...mock, track: mock.track ?? get().track }
+    const id = (await db.mocks.add(tagged)) as number
+    set((st) => ({
+      allMocks: [...st.allMocks, { ...tagged, id }],
+      mocks:
+        (tagged.track ?? DEFAULT_TRACK) === st.track ? [...st.mocks, { ...tagged, id }] : st.mocks,
+    }))
     return id
   },
 
@@ -197,6 +266,16 @@ export const useStore = create<StoreState>((set, get) => ({
       db.pairs.clear(),
       db.moduleStats.clear(),
     ])
-    set({ srs: {}, meta: {}, reviews: [], mocks: [], pairStats: {}, moduleStats: {} })
+    set({
+      allSrs: {},
+      allReviews: [],
+      allMocks: [],
+      srs: {},
+      meta: {},
+      reviews: [],
+      mocks: [],
+      pairStats: {},
+      moduleStats: {},
+    })
   },
 }))

@@ -1,18 +1,12 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useStore } from '../lib/store'
-import { DOMAINS } from '../lib/blueprint'
 import { competencyCoverage } from '../lib/stats'
 import type { CoverageStatus } from '../lib/stats'
-import { LEARN_NOTES } from '../data/learn'
-import { lawRefsForCompetency, lawRefsById } from '../data'
 import { buildQueue } from '../lib/queue'
 import type { StudyItem } from '../lib/types'
 import { DrillRunner } from '../session/DrillRunner'
 import { PageHeader, Card, Chip } from '../components/ui'
-
-const NOTE = new Map(LEARN_NOTES.map((n) => [n.competency, n]))
-const COMP_TITLE = new Map(DOMAINS.flatMap((d) => d.competencies).map((c) => [c.id, c.title]))
 
 const STATUS_STYLE: Record<CoverageStatus, string> = {
   untouched: 'bg-surface-2 text-muted',
@@ -24,10 +18,15 @@ export function Learn() {
   const items = useStore((s) => s.items)
   const srs = useStore((s) => s.srs)
   const reviews = useStore((s) => s.reviews)
+  const trackDef = useStore((s) => s.trackDef)
   const [selected, setSelected] = useState<string | null>(null)
   const [queue, setQueue] = useState<StudyItem[] | null>(null)
 
-  const cov = competencyCoverage(reviews)
+  const domains = trackDef.domains
+  const notes = new Map(trackDef.learnNotes.map((n) => [n.competency, n]))
+  const compTitle = new Map(domains.flatMap((d) => d.competencies).map((c) => [c.id, c.title]))
+  const refsById = new Map(trackDef.refs.map((r) => [r.id, r]))
+  const cov = competencyCoverage(reviews, domains)
 
   if (queue) {
     return (
@@ -38,16 +37,19 @@ export function Learn() {
   }
 
   if (selected) {
-    const note = NOTE.get(selected)
-    const refs = lawRefsForCompetency(selected)
-    const anchor = note?.anchorCase ? lawRefsById.get(note.anchorCase) : undefined
+    const note = notes.get(selected)
+    const refs = trackDef.refs.filter((r) => r.competency === selected)
+    const anchor = note?.anchorCase ? refsById.get(note.anchorCase) : undefined
     const startChecks = () => {
       const q = buildQueue(items, srs, reviews, { competency: selected, size: 5, includeNew: true })
       if (q.length) setQueue(q)
     }
     return (
       <div className="mx-auto max-w-2xl">
-        <PageHeader kicker={`Learn · ${selected}`} title={COMP_TITLE.get(selected) ?? selected}>
+        <PageHeader
+          kicker={`${trackDef.label} · Learn · ${selected}`}
+          title={compTitle.get(selected) ?? selected}
+        >
           <button onClick={() => setSelected(null)} className="text-xs text-muted hover:text-fg">
             ← All topics
           </button>
@@ -70,7 +72,9 @@ export function Learn() {
 
         {refs.length > 0 && (
           <Card className="mb-4">
-            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Governing law</div>
+            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">
+              Governing {trackDef.referenceNoun}
+            </div>
             <div className="space-y-2">
               {refs.map((r) => (
                 <div key={r.id} className="text-sm">
@@ -108,16 +112,16 @@ export function Learn() {
   }
 
   const counts = { untouched: 0, seen: 0, mastered: 0 }
-  for (const d of DOMAINS) for (const c of d.competencies) counts[cov[c.id].status]++
+  for (const d of domains) for (const c of d.competencies) counts[cov[c.id].status]++
 
   return (
     <div className="mx-auto max-w-3xl">
-      <PageHeader kicker="Learn" title="Concepts & coverage" />
+      <PageHeader kicker={`${trackDef.label} · Learn`} title="Concepts & coverage" />
       <Card className="mb-6">
         <p className="text-sm leading-relaxed text-muted">
-          Concept-first study across the blueprint. Each topic gives a short explanation, the
-          governing law, and a few practice checks that enter your spaced-repetition schedule. Badges
-          show your coverage:{' '}
+          Concept-first study across the {trackDef.label} blueprint. Each topic gives a short
+          explanation, the governing {trackDef.referenceNoun}, and a few practice checks that enter
+          your spaced-repetition schedule. Badges show your coverage:{' '}
           <span className="font-medium text-accent">{counts.mastered} mastered</span>, {counts.seen}{' '}
           seen, {counts.untouched} untouched.
         </p>
@@ -128,8 +132,8 @@ export function Learn() {
           <div className="min-w-0">
             <h2 className="text-sm font-semibold">AI &amp; Governance module</h2>
             <p className="mt-0.5 text-xs text-muted">
-              EU AI Act · GDPR × AI · ethics frameworks · DPIA methodology · governance frameworks —
-              notes + quizzes, tracked separately from the blueprint.
+              EU AI Act · GDPR × AI · ethics frameworks · DPIA methodology · NIST AI RMF · ISO/IEC
+              42001 — notes, case files and quizzes, shared by both tracks.
             </p>
           </div>
           <Link
@@ -140,8 +144,9 @@ export function Learn() {
           </Link>
         </div>
       </Card>
+
       <div className="space-y-4">
-        {DOMAINS.map((d) => (
+        {domains.map((d) => (
           <Card key={d.id}>
             <h2 className="mb-3 font-semibold">
               <span className="text-accent">{d.id}.</span> {d.title}

@@ -1,5 +1,5 @@
 import type { Flashcard } from '../lib/types'
-import { lawRefsById } from '../data'
+import { ALL_REFS_BY_ID } from '../lib/tracks'
 import { Chip } from '../components/ui'
 
 export function CardView({ card, revealed }: { card: Flashcard; revealed: boolean }) {
@@ -15,7 +15,7 @@ export function CardView({ card, revealed }: { card: Flashcard; revealed: boolea
           {card.lawRefs && card.lawRefs.length > 0 && (
             <div className="mt-3 flex flex-wrap gap-1.5">
               {card.lawRefs.map((r) => {
-                const ref = lawRefsById.get(r)
+                const ref = ALL_REFS_BY_ID.get(r)
                 return <Chip key={r}>{ref ? `${ref.instrument} ${ref.citation}` : r}</Chip>
               })}
             </div>

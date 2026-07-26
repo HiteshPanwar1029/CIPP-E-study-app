@@ -1,5 +1,5 @@
 import type { Question, MockForm } from './types'
-import { DOMAINS, domainWeight, allocateForm } from './blueprint'
+import { CIPPE_DOMAINS, domainWeight, allocateForm, type Domain } from './blueprint'
 import type { DomainId } from './blueprint'
 
 export const FORM_SIZE: Record<MockForm, number> = {
@@ -31,16 +31,18 @@ export function buildMockForm(
   questions: Question[],
   form: MockForm,
   focusDomain?: DomainId,
+  domains: Domain[] = CIPPE_DOMAINS,
+  formSize: Record<MockForm, number> = FORM_SIZE,
 ): string[] {
-  const size = FORM_SIZE[form]
+  const size = formSize[form]
   if (form === 'domain-focus' && focusDomain) {
     return shuffle(questions.filter((q) => q.domain === focusDomain))
       .slice(0, size)
       .map((q) => q.id)
   }
-  const alloc = allocateForm(size)
+  const alloc = allocateForm(domains, size)
   const chosen: string[] = []
-  for (const d of DOMAINS) {
+  for (const d of domains) {
     const pool = shuffle(questions.filter((q) => q.domain === d.id))
     chosen.push(...pool.slice(0, alloc[d.id]).map((q) => q.id))
   }
@@ -70,6 +72,7 @@ export function scoreMock(
   questionIds: string[],
   answers: Record<string, string[]>,
   getQuestion: (id: string) => Question | undefined,
+  domains: Domain[] = CIPPE_DOMAINS,
 ): MockScore {
   const domAgg: Record<string, { c: number; t: number }> = {}
   const bloomAgg: Record<string, { c: number; t: number }> = {}
@@ -93,10 +96,10 @@ export function scoreMock(
   const overall = questionIds.length ? correctCount / questionIds.length : 0
   let weighted = 0
   let wsum = 0
-  for (const d of DOMAINS) {
+  for (const d of domains) {
     if (scoreByDomain[d.id] !== undefined) {
-      weighted += domainWeight(d.id) * scoreByDomain[d.id]
-      wsum += domainWeight(d.id)
+      weighted += domainWeight(domains, d.id) * scoreByDomain[d.id]
+      wsum += domainWeight(domains, d.id)
     }
   }
   return {

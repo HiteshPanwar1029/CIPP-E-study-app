@@ -43,6 +43,35 @@ export class CippeDB extends Dexie {
     this.version(3).stores({
       moduleStats: 'sectionId',
     })
+    // v4 — multi-track (CIPP/E + AIGP): reviews and mock attempts carry a
+    // track tag so per-track analytics stay separate. Existing rows predate
+    // AIGP and are therefore CIPP/E.
+    this.version(4)
+      .stores({
+        reviews: '++id, itemId, ts, competency, domain, bloomLevel, mode, track',
+        mocks: '++id, startedAt, track',
+      })
+      .upgrade(async (tx) => {
+        await tx
+          .table('reviews')
+          .toCollection()
+          .modify((r: { track?: string }) => {
+            if (!r.track) r.track = 'cippe'
+          })
+        await tx
+          .table('mocks')
+          .toCollection()
+          .modify((m: { track?: string }) => {
+            if (!m.track) m.track = 'cippe'
+          })
+        await tx
+          .table('settings')
+          .toCollection()
+          .modify((s: { examDate?: string; examDates?: Record<string, string>; activeTrack?: string }) => {
+            if (!s.activeTrack) s.activeTrack = 'cippe'
+            if (s.examDate && !s.examDates) s.examDates = { cippe: s.examDate }
+          })
+      })
   }
 }
 

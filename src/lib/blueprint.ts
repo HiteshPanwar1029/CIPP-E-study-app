@@ -28,7 +28,7 @@ export interface Domain {
   competencies: Competency[]
 }
 
-export const DOMAINS: Domain[] = [
+export const CIPPE_DOMAINS: Domain[] = [
   {
     id: 'I',
     title: 'Introduction to European Data Protection',
@@ -107,32 +107,38 @@ export const BLOOMS: BloomInfo[] = [
   { id: 'analyze', label: 'Analyze', tier: 'applied' },
 ]
 
-/** Scored items on the real exam (unscored pretest items bring the total to 90). */
+/** CIPP/E: scored items on the real exam (unscored pretest items bring the total to 90). */
 export const SCORED_ITEMS = 75
-/** Items on a full mock form. */
+/** CIPP/E: items on a full mock form. */
 export const FULL_FORM = 90
 
 const mid = (c: { minQ: number; maxQ: number }): number => (c.minQ + c.maxQ) / 2
 
-export const totalMidpoint = (): number => DOMAINS.reduce((s, d) => s + mid(d), 0)
+/**
+ * Blueprint helpers are generic over a domain tree so that every certification
+ * track (CIPP/E, AIGP, ...) shares one weighting implementation. Pass the
+ * active track's domains — see src/lib/tracks.ts.
+ */
+export const totalMidpoint = (domains: Domain[]): number =>
+  domains.reduce((s, d) => s + mid(d), 0)
 
-export const domainWeight = (id: DomainId): number => {
-  const d = DOMAINS.find((x) => x.id === id)
+export const domainWeight = (domains: Domain[], id: DomainId): number => {
+  const d = domains.find((x) => x.id === id)
   if (!d) return 0
-  return mid(d) / totalMidpoint()
+  return mid(d) / totalMidpoint(domains)
 }
 
-export const maxDomainWeight = (): number =>
-  Math.max(...DOMAINS.map((d) => domainWeight(d.id)))
+export const maxDomainWeight = (domains: Domain[]): number =>
+  Math.max(...domains.map((d) => domainWeight(domains, d.id)))
 
 /**
- * Allocate `size` questions across the five domains proportional to blueprint
+ * Allocate `size` questions across the domains proportional to blueprint
  * weight, using largest-remainder rounding so the parts sum to exactly `size`.
- * allocateForm(90) => { I: 12, II: 28, III: 20, IV: 16, V: 14 }.
+ * allocateForm(CIPPE_DOMAINS, 90) => { I: 12, II: 28, III: 20, IV: 16, V: 14 }.
  */
-export function allocateForm(size: number): Record<DomainId, number> {
-  const total = totalMidpoint()
-  const rows = DOMAINS.map((d) => {
+export function allocateForm(domains: Domain[], size: number): Record<string, number> {
+  const total = totalMidpoint(domains)
+  const rows = domains.map((d) => {
     const exact = (mid(d) / total) * size
     const base = Math.floor(exact)
     return { id: d.id, base, frac: exact - base }
@@ -145,7 +151,10 @@ export function allocateForm(size: number): Record<DomainId, number> {
     used += 1
     i += 1
   }
-  const out = {} as Record<DomainId, number>
+  const out: Record<string, number> = {}
   for (const r of rows) out[r.id] = r.base
   return out
 }
+
+/** Back-compat alias — the CIPP/E tree. Prefer the active track’s domains. */
+export const DOMAINS = CIPPE_DOMAINS

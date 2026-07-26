@@ -1,11 +1,13 @@
 import { useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
-import { DOMAINS } from '../lib/blueprint'
-import { COMPETENCY_NODES, LAW_REFS, questionsForCompetency, lawRefsForCompetency } from '../data'
+import { useStore } from '../lib/store'
 import { PageHeader, Card, Chip } from '../components/ui'
 
 export function Reference() {
   const { hash } = useLocation()
+  const trackDef = useStore((s) => s.trackDef)
+  const domains = trackDef.domains
+
   useEffect(() => {
     if (!hash) return
     const el = document.getElementById(decodeURIComponent(hash.slice(1)))
@@ -15,21 +17,23 @@ export function Reference() {
     }
   }, [hash])
 
+  const totalComps = domains.reduce((n, d) => n + d.competencies.length, 0)
+
   return (
     <div className="mx-auto max-w-3xl">
-      <PageHeader kicker="Reference library" title="Competency tree & law" />
+      <PageHeader kicker={`${trackDef.label} · Reference library`} title="Competency tree & sources" />
 
       <Card className="mb-6">
         <p className="text-sm leading-relaxed text-muted">
-          The IAPP CIPP/E blueprint spine (v1.3.3): {DOMAINS.length} domains, {COMPETENCY_NODES.length}{' '}
-          competencies, {LAW_REFS.length} law references. Expand a competency for its performance
-          indicators, the governing articles and cases with plain-language summaries, and how many
-          practice items touch it. Ranges are the blueprint’s min–max questions.
+          The {trackDef.blueprintVersion} spine: {domains.length} domains, {totalComps} competencies,{' '}
+          {trackDef.refs.length} {trackDef.referenceNoun}. Expand a competency for its performance
+          indicators, the governing sources with plain-language summaries, and how many practice
+          items touch it. Ranges are the blueprint’s min–max questions.
         </p>
       </Card>
 
       <div className="space-y-4">
-        {DOMAINS.map((d) => (
+        {domains.map((d) => (
           <Card key={d.id}>
             <div className="mb-3 flex items-baseline justify-between gap-3">
               <h2 className="font-semibold">
@@ -41,9 +45,9 @@ export function Reference() {
             </div>
             <div className="space-y-2">
               {d.competencies.map((c) => {
-                const node = COMPETENCY_NODES.find((n) => n.id === c.id)
-                const qs = questionsForCompetency(c.id)
-                const refs = lawRefsForCompetency(c.id)
+                const node = trackDef.competencyNodes.find((n) => n.id === c.id)
+                const qs = trackDef.questions.filter((q) => q.competency === c.id)
+                const refs = trackDef.refs.filter((r) => r.competency === c.id)
                 return (
                   <details key={c.id} id={c.id} className="scroll-mt-20 rounded-lg border border-border">
                     <summary className="flex cursor-pointer items-center justify-between gap-2 px-3 py-2 text-sm">

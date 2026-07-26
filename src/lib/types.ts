@@ -1,5 +1,8 @@
 import type { DomainId, BloomLevel } from './blueprint'
 
+/** Certification tracks the app can study in parallel. */
+export type TrackId = 'cippe' | 'aigp'
+
 export type QuestionType = 'single' | 'multiple' | 'scenario'
 export type Grade = 'again' | 'hard' | 'good' | 'easy'
 export type StudyMode = 'learn' | 'drill' | 'mock' | 'review'
@@ -24,6 +27,14 @@ export interface Question {
   distractorRationale?: Record<string, string>
   tags?: string[]
   source: Source
+  /**
+   * Case-study support. IAPP exams present a scenario followed by several
+   * linked questions; `scenario` travels with each item so it still makes
+   * sense when spaced repetition surfaces the question on its own.
+   */
+  scenario?: string
+  caseId?: string
+  caseTitle?: string
 }
 
 export interface Flashcard {
@@ -88,6 +99,8 @@ export interface ReviewLogEntry {
   domain: DomainId
   competency: string
   bloomLevel: BloomLevel
+  /** Which certification track the item belongs to. Absent on pre-v4 rows (treated as CIPP/E). */
+  track?: TrackId
 }
 
 export type MockForm = 'full-90' | 'half-45' | 'domain-focus'
@@ -99,6 +112,8 @@ export interface MockAttempt {
   durationMs: number
   form: MockForm
   focusDomain?: DomainId
+  /** Which certification track this attempt belongs to. Absent on pre-v4 rows. */
+  track?: TrackId
   questionIds: string[]
   answers: Record<string, string[]>
   /** Milliseconds spent on each question (summed across visits). Absent on pre-pacing attempts. */
@@ -119,8 +134,12 @@ export interface ItemMeta {
 export interface Settings {
   key: string
   targetRetention: number
-  /** ISO date (yyyy-mm-dd) of the exam, if set — drives the dashboard planner. */
+  /** Legacy single exam date (pre-multi-track). Migrated into examDates.cippe. */
   examDate?: string
+  /** Which track the app is currently studying. */
+  activeTrack?: TrackId
+  /** ISO date (yyyy-mm-dd) of each track's exam — drives the dashboard planner. */
+  examDates?: Partial<Record<TrackId, string>>
 }
 
 // ── Confusion pairs — rapid discrimination training ─────────────────────────

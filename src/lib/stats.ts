@@ -1,5 +1,5 @@
 import type { ReviewLogEntry, SrsState } from './types'
-import { DOMAINS, domainWeight } from './blueprint'
+import { CIPPE_DOMAINS, domainWeight, type Domain } from './blueprint'
 
 export interface Acc {
   correct: number
@@ -49,10 +49,10 @@ export interface Readiness {
   days: number
 }
 /** Blueprint-weighted mean of per-domain accuracy. Indicative only. */
-export function readiness(reviews: ReviewLogEntry[]): Readiness {
+export function readiness(reviews: ReviewLogEntry[], domains: Domain[] = CIPPE_DOMAINS): Readiness {
   const dom = byDomain(reviews)
   let score = 0
-  for (const d of DOMAINS) score += domainWeight(d.id) * rate(dom[d.id])
+  for (const d of domains) score += domainWeight(domains, d.id) * rate(dom[d.id])
   return { score, reviews: reviews.length, days: distinctDays(reviews).size }
 }
 
@@ -111,10 +111,13 @@ export interface Coverage {
   correct: number
 }
 /** Per-competency study coverage against the full tree. */
-export function competencyCoverage(reviews: ReviewLogEntry[]): Record<string, Coverage> {
+export function competencyCoverage(
+  reviews: ReviewLogEntry[],
+  domains: Domain[] = CIPPE_DOMAINS,
+): Record<string, Coverage> {
   const by = byCompetency(reviews)
   const out: Record<string, Coverage> = {}
-  for (const d of DOMAINS) {
+  for (const d of domains) {
     for (const c of d.competencies) {
       const a = by[c.id]
       const total = a?.total ?? 0
@@ -175,17 +178,18 @@ export interface ReadinessProjection {
  */
 export function readinessProjection(
   reviews: ReviewLogEntry[],
+  domains: Domain[] = CIPPE_DOMAINS,
   target = 0.72,
   now = new Date(),
 ): ReadinessProjection {
-  const nowScore = readiness(reviews).score
+  const nowScore = readiness(reviews, domains).score
   const cutoff = now.getTime() - 7 * 86400000
   const past = reviews.filter((r) => new Date(r.ts).getTime() <= cutoff)
-  const ratePerDay = (nowScore - readiness(past).score) / 7
+  const ratePerDay = (nowScore - readiness(past, domains).score) / 7
   const daysToTarget =
     nowScore >= target ? 0 : ratePerDay > 0.0005 ? Math.ceil((target - nowScore) / ratePerDay) : null
   const dom = byDomain(reviews)
-  const perDomain = DOMAINS.map((d) => {
+  const perDomain = domains.map((d) => {
     const a = dom[d.id]
     const mastery = rate(a)
     const started = (a?.total ?? 0) > 0

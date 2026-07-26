@@ -3,10 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { useStore } from '../lib/store'
 import { buildQueue } from '../lib/queue'
 import { dueCount } from '../lib/stats'
-import { DOMAINS } from '../lib/blueprint'
 import type { DomainId, BloomLevel } from '../lib/blueprint'
 import type { MockForm, StudyItem } from '../lib/types'
-import { CONFUSION_PAIRS } from '../data/confusionPairs'
 import { DrillRunner } from '../session/DrillRunner'
 import { MockRunner } from '../session/MockRunner'
 import { PairRunner, pairRound, mixedRound, type PairPrompt } from '../session/PairRunner'
@@ -25,6 +23,15 @@ export function Session() {
   const srs = useStore((s) => s.srs)
   const reviews = useStore((s) => s.reviews)
   const pairStats = useStore((s) => s.pairStats)
+  const trackDef = useStore((s) => s.trackDef)
+  const DOMAINS = trackDef.domains
+  const PAIRS = trackDef.confusionPairs
+  const CASES = trackDef.cases
+
+  const startCase = (caseId: string) => {
+    const qs = items.filter((it) => it.kind === 'question' && it.caseId === caseId)
+    if (qs.length) setActive({ kind: 'drill', queue: qs })
+  }
 
   const [active, setActive] = useState<Active | null>(null)
   const [domain, setDomain] = useState<DomainId | ''>('')
@@ -72,7 +79,7 @@ export function Session() {
 
   return (
     <div className="mx-auto max-w-2xl">
-      <PageHeader kicker="Session" title="Study session" />
+      <PageHeader kicker={`${trackDef.label} · Session`} title="Study session" />
 
       <Card className="mb-4">
         <h2 className="mb-1 text-sm font-semibold">Drill</h2>
@@ -138,6 +145,36 @@ export function Session() {
         </div>
       </Card>
 
+      {CASES.length > 0 && (
+        <Card className="mb-4">
+          <h2 className="mb-1 text-sm font-semibold">Case studies</h2>
+          <p className="mb-4 text-xs text-muted">
+            One scenario, several linked questions — the format the real exam uses. Each case is
+            modelled on a documented real-world governance failure. Answers feed your
+            spaced-repetition schedule like any other item.
+          </p>
+          <div className="space-y-2">
+            {CASES.map((c) => {
+              const n = items.filter((it) => it.kind === 'question' && it.caseId === c.id).length
+              return (
+                <button
+                  key={c.id}
+                  onClick={() => startCase(c.id)}
+                  className="flex w-full items-start justify-between gap-3 rounded-lg border border-border px-3 py-2.5 text-left hover:border-accent"
+                >
+                  <span className="min-w-0">
+                    <span className="text-sm font-medium">{c.title}</span>
+                    <span className="mt-0.5 block text-xs text-muted">{c.premise}</span>
+                    <span className="mt-1 block text-[11px] italic text-muted">{c.groundedIn}</span>
+                  </span>
+                  <span className="shrink-0 text-xs tabular-nums text-muted">{n} q</span>
+                </button>
+              )
+            })}
+          </div>
+        </Card>
+      )}
+
       <Card className="mb-4">
         <h2 className="mb-1 text-sm font-semibold">Confusion pairs</h2>
         <p className="mb-4 text-xs text-muted">
@@ -148,7 +185,7 @@ export function Session() {
           onClick={() =>
             setActive({
               kind: 'pairs',
-              queue: mixedRound(CONFUSION_PAIRS, pairStats),
+              queue: mixedRound(PAIRS, pairStats),
               title: 'Mixed round',
             })
           }
@@ -157,7 +194,7 @@ export function Session() {
           Mixed round · 12
         </button>
         <div className="flex flex-wrap gap-1.5">
-          {CONFUSION_PAIRS.map((p) => {
+          {PAIRS.map((p) => {
             const s = pairStats[p.id]
             const pct = s && s.attempts > 0 ? Math.round((s.correct / s.attempts) * 100) : null
             return (
@@ -190,13 +227,13 @@ export function Session() {
             onClick={() => setActive({ kind: 'mock', form: 'full-90' })}
             className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-accent-fg"
           >
-            Full · 90 / 150 min
+            {trackDef.exam.formLabel['full-90']}
           </button>
           <button
             onClick={() => setActive({ kind: 'mock', form: 'half-45' })}
             className="rounded-lg border border-border px-4 py-2 text-sm"
           >
-            Half · 45 / 75 min
+            {trackDef.exam.formLabel['half-45']}
           </button>
         </div>
         <div className="mt-4">

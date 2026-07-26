@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { useStore } from '../lib/store'
-import { DOMAINS, BLOOMS, domainWeight, maxDomainWeight } from '../lib/blueprint'
+import { BLOOMS, domainWeight, maxDomainWeight } from '../lib/blueprint'
 import {
   byDomain,
   byBloom,
@@ -14,37 +14,51 @@ import {
   readinessProjection,
   examPlan,
 } from '../lib/stats'
-import { PageHeader, Card, Meter } from '../components/ui'
+import { PageHeader, Card, Meter, TrackSwitcher } from '../components/ui'
 import { DueLoadChart } from '../components/charts'
-
-const maxW = maxDomainWeight()
-const TOTAL_COMPS = DOMAINS.reduce((n, d) => n + d.competencies.length, 0)
 
 export function Dashboard() {
   const reviews = useStore((s) => s.reviews)
   const srs = useStore((s) => s.srs)
   const settings = useStore((s) => s.settings)
   const items = useStore((s) => s.items)
+  const track = useStore((s) => s.track)
+  const trackDef = useStore((s) => s.trackDef)
   const srsArr = Object.values(srs)
+
+  const domains = trackDef.domains
+  const maxW = maxDomainWeight(domains)
+  const totalComps = domains.reduce((n, d) => n + d.competencies.length, 0)
 
   const dom = byDomain(reviews)
   const bloom = byBloom(reviews)
-  const r = readiness(reviews)
+  const r = readiness(reviews, domains)
   const due = dueCount(srsArr)
   const cw = confidentlyWrong(reviews)
   const load = dueLoad(srsArr)
   const hasData = reviews.length > 0
 
-  const cov = competencyCoverage(reviews)
+  const cov = competencyCoverage(reviews, domains)
   const covCounts = { untouched: 0, seen: 0, mastered: 0 }
-  for (const d of DOMAINS) for (const c of d.competencies) covCounts[cov[c.id].status]++
-  const proj = readinessProjection(reviews)
+  for (const d of domains) for (const c of d.competencies) covCounts[cov[c.id].status]++
+  const proj = readinessProjection(reviews, domains)
 
-  const plan = settings.examDate ? examPlan(settings.examDate, items.length, srsArr.length) : null
+  const examDate = settings.examDates?.[track]
+  const plan = examDate ? examPlan(examDate, items.length, srsArr.length) : null
   const suggestLowerRetention = !!plan && plan.finalWeek && settings.targetRetention > 0.86
 
   return (
     <div className="mx-auto max-w-3xl">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-surface-2/50 p-3">
+        <div>
+          <div className="text-xs font-medium uppercase tracking-wide text-muted">
+            Studying for
+          </div>
+          <div className="text-sm text-muted">{trackDef.tagline}</div>
+        </div>
+        <TrackSwitcher />
+      </div>
+
       <PageHeader kicker="Today" title="Dashboard">
         <Link
           to="/session"
@@ -64,12 +78,12 @@ export function Dashboard() {
         <div className="mb-1 flex items-center justify-between">
           <h2 className="text-sm font-semibold">Exam plan</h2>
           <Link to="/settings" className="text-xs text-accent hover:underline">
-            {settings.examDate ? 'Change date →' : 'Set exam date →'}
+            {examDate ? 'Change date →' : 'Set exam date →'}
           </Link>
         </div>
         {!plan ? (
           <p className="text-xs text-muted">
-            Set your exam date in Settings and a daily pace plan appears here.
+            Set your {trackDef.label} exam date in Settings and a daily pace plan appears here.
           </p>
         ) : plan.daysLeft < 0 ? (
           <p className="text-sm text-muted">
@@ -85,7 +99,7 @@ export function Dashboard() {
             <p className="text-sm">
               <span className="font-semibold tabular-nums">{plan.daysLeft}</span> day
               {plan.daysLeft === 1 ? '' : 's'} to{' '}
-              {new Date(`${settings.examDate}T00:00:00`).toLocaleDateString(undefined, {
+              {new Date(`${examDate}T00:00:00`).toLocaleDateString(undefined, {
                 month: 'long',
                 day: 'numeric',
               })}
@@ -118,8 +132,8 @@ export function Dashboard() {
           <span className="text-xs text-muted">bar width = exam weight · fill = accuracy</span>
         </div>
         <div className="space-y-3">
-          {DOMAINS.map((d) => {
-            const w = domainWeight(d.id)
+          {domains.map((d) => {
+            const w = domainWeight(domains, d.id)
             const acc = dom[d.id]
             return (
               <div key={d.id} className="flex items-center gap-3">
@@ -141,8 +155,7 @@ export function Dashboard() {
         </div>
         {!hasData && (
           <p className="mt-4 text-xs text-muted">
-            No reviews yet — bars fill as you study. Weights follow the IAPP CIPP/E blueprint
-            (v1.3.3); Domain II is the heaviest at ~31%.
+            No reviews yet — bars fill as you study. Weights follow the {trackDef.blueprintVersion}.
           </p>
         )}
       </Card>
@@ -184,12 +197,12 @@ export function Dashboard() {
             </Link>
           </div>
           <div className="mb-2 flex h-2 overflow-hidden rounded-full bg-surface-2">
-            <div className="bg-accent" style={{ width: `${(covCounts.mastered / TOTAL_COMPS) * 100}%` }} />
-            <div className="bg-accent-soft" style={{ width: `${(covCounts.seen / TOTAL_COMPS) * 100}%` }} />
+            <div className="bg-accent" style={{ width: `${(covCounts.mastered / totalComps) * 100}%` }} />
+            <div className="bg-accent-soft" style={{ width: `${(covCounts.seen / totalComps) * 100}%` }} />
           </div>
           <p className="text-xs text-muted">
             <span className="font-medium text-accent">{covCounts.mastered} mastered</span> ·{' '}
-            {covCounts.seen} seen · {covCounts.untouched} untouched of {TOTAL_COMPS} competencies.
+            {covCounts.seen} seen · {covCounts.untouched} untouched of {totalComps} competencies.
           </p>
         </Card>
 
@@ -240,8 +253,9 @@ export function Dashboard() {
             </span>
           </div>
           <p className="mt-2 text-xs text-muted">
-            Based on {r.reviews} reviews over {r.days} day{r.days === 1 ? '' : 's'}. Indicative only —
-            an internal study heuristic, not a prediction or a guarantee of passing the IAPP exam.
+            Based on {r.reviews} reviews over {r.days} day{r.days === 1 ? '' : 's'} in {trackDef.label}.
+            Indicative only — an internal study heuristic, not a prediction or a guarantee of passing
+            the IAPP exam.
           </p>
         </Card>
 

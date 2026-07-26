@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
-import { ThemeToggle } from './ui'
+import { ThemeToggle, TrackSwitcher } from './ui'
 import { useStore } from '../lib/store'
 import { dueCount } from '../lib/stats'
 
@@ -77,6 +77,7 @@ function NavIcon({ name }: { name: string }) {
 export function Layout() {
   const init = useStore((s) => s.init)
   const srs = useStore((s) => s.srs)
+  const trackDef = useStore((s) => s.trackDef)
   useEffect(() => {
     void init()
   }, [init])
@@ -94,8 +95,10 @@ export function Layout() {
         {/* Desktop / tablet sidebar */}
         <aside className="hidden w-56 shrink-0 border-r border-border px-4 py-6 sm:block">
           <div className="mb-8 px-2">
-            <div className="text-sm font-semibold tracking-tight">CIPP/E Prep</div>
-            <div className="text-xs text-muted">Blueprint-aligned trainer</div>
+            <div className="text-sm font-semibold tracking-tight">IAPP Prep</div>
+            <div className="text-xs text-muted">
+              Studying <span className="font-medium text-accent">{trackDef.label}</span>
+            </div>
           </div>
           <nav className="flex flex-col gap-1" aria-label="Primary">
             {NAV.map((n) => (
@@ -123,11 +126,16 @@ export function Layout() {
 
         <div className="flex min-w-0 flex-1 flex-col">
           <header className="flex items-center justify-between gap-4 border-b border-border px-5 py-4 sm:px-6">
-            <div className="text-xs text-muted">
-              <span className="font-semibold text-fg sm:hidden">CIPP/E Prep · </span>
-              Local-first · no login · your data stays on this device
+            <div className="min-w-0 text-xs text-muted">
+              <span className="hidden sm:inline">
+                Local-first · no login · your data stays on this device
+              </span>
+              <span className="sm:hidden">IAPP Prep</span>
             </div>
-            <ThemeToggle />
+            <div className="flex items-center gap-2">
+              <TrackSwitcher size="sm" />
+              <ThemeToggle />
+            </div>
           </header>
           {/* extra bottom padding on mobile so the fixed bar never covers content */}
           <main id="main" className="flex-1 px-5 pt-8 pb-28 sm:px-6 sm:pb-8">

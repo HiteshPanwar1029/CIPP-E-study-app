@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react'
 import { useTheme, type Theme } from '../lib/theme'
+import { useStore } from '../lib/store'
+import { TRACKS, TRACK_IDS } from '../lib/tracks'
 
 export function PageHeader({
   title,
@@ -88,6 +90,49 @@ export function ThemeToggle() {
           {o.label}
         </button>
       ))}
+    </div>
+  )
+}
+
+/**
+ * Certification-track picker. Switching swaps the entire content set,
+ * blueprint and analytics scope — see src/lib/tracks.ts.
+ */
+export function TrackSwitcher({ size = 'lg' }: { size?: 'lg' | 'sm' }) {
+  const track = useStore((s) => s.track)
+  const setTrack = useStore((s) => s.setTrack)
+  const big = size === 'lg'
+  return (
+    <div
+      role="radiogroup"
+      aria-label="Certification track"
+      className={
+        'inline-flex rounded-xl border border-border bg-surface p-1 ' + (big ? 'text-sm' : 'text-xs')
+      }
+    >
+      {TRACK_IDS.map((id) => {
+        const t = TRACKS[id]
+        const active = track === id
+        return (
+          <button
+            key={id}
+            type="button"
+            role="radio"
+            aria-checked={active}
+            onClick={() => void setTrack(id)}
+            title={t.tagline}
+            className={
+              'rounded-lg transition-colors ' +
+              (big ? 'px-4 py-2 ' : 'px-2.5 py-1 ') +
+              (active
+                ? 'bg-accent text-accent-fg font-semibold'
+                : 'text-muted hover:bg-surface-2 hover:text-fg')
+            }
+          >
+            {t.label}
+          </button>
+        )
+      })}
     </div>
   )
 }

@@ -1,17 +1,21 @@
 import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useStore } from '../lib/store'
-import { DOMAINS, BLOOMS } from '../lib/blueprint'
+import { BLOOMS } from '../lib/blueprint'
 import { confidentlyWrong, latestPerItem } from '../lib/stats'
-import { sameSet, FORM_MINUTES } from '../lib/mock'
+import { sameSet } from '../lib/mock'
 import type { Question, StudyItem } from '../lib/types'
 import { PageHeader, Card, Meter, Chip } from '../components/ui'
 
 const isQuestion = (it: StudyItem | undefined): it is Extract<StudyItem, { kind: 'question' }> =>
   !!it && it.kind === 'question'
 
-function formLabel(f: string): string {
-  return f === 'full-90' ? 'Full mock (90)' : f === 'half-45' ? 'Half mock (45)' : 'Domain mock'
+function formLabel(f: string, sizes: Record<string, number>): string {
+  return f === 'full-90'
+    ? `Full mock (${sizes['full-90']})`
+    : f === 'half-45'
+      ? `Half mock (${sizes['half-45']})`
+      : 'Domain mock'
 }
 
 type Filter = 'incorrect' | 'confident' | 'flagged'
@@ -23,6 +27,10 @@ export function Results() {
   const meta = useStore((s) => s.meta)
   const srs = useStore((s) => s.srs)
   const requeue = useStore((s) => s.requeue)
+  const trackDef = useStore((s) => s.trackDef)
+  const DOMAINS = trackDef.domains
+  const sizes = trackDef.exam.formSize
+  const FORM_MINUTES = trackDef.exam.formMinutes
   const [params] = useSearchParams()
   const [filter, setFilter] = useState<Filter>('incorrect')
 
@@ -64,7 +72,7 @@ export function Results() {
 
   return (
     <div className="mx-auto max-w-3xl">
-      <PageHeader kicker="Results" title="Results & review" />
+      <PageHeader kicker={`${trackDef.label} · Results`} title="Results & review" />
 
       {empty && (
         <Card>
@@ -79,7 +87,7 @@ export function Results() {
         <Card className="mb-6">
           <div className="mb-4 flex items-baseline justify-between gap-3">
             <h2 className="text-sm font-semibold">
-              {formLabel(mock.form)} · {new Date(mock.startedAt).toLocaleString()}
+              {formLabel(mock.form, sizes)} · {new Date(mock.startedAt).toLocaleString()}
             </h2>
             <span className="text-2xl font-semibold tabular-nums">
               {Math.round(mock.overall * 100)}%
@@ -172,7 +180,7 @@ export function Results() {
                 className="flex items-center justify-between rounded-md px-2 py-1.5 text-sm hover:bg-surface-2"
               >
                 <span>
-                  {formLabel(m.form)} · {new Date(m.startedAt).toLocaleDateString()}
+                  {formLabel(m.form, sizes)} · {new Date(m.startedAt).toLocaleDateString()}
                 </span>
                 <span className="tabular-nums text-muted">{Math.round(m.overall * 100)}%</span>
               </Link>

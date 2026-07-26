@@ -12,9 +12,9 @@ async function optionalPwa(): Promise<PluginOption[]> {
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg'],
       manifest: {
-        name: 'CIPP/E Prep',
-        short_name: 'CIPP/E',
-        description: 'Local-first, blueprint-aligned study tool for the IAPP CIPP/E exam.',
+        name: 'IAPP Prep — CIPP/E & AIGP',
+        short_name: 'IAPP Prep',
+        description: 'Local-first, blueprint-aligned study tool for the IAPP CIPP/E and AIGP exams.',
         theme_color: '#0f766e',
         background_color: '#faf9f7',
         display: 'standalone',

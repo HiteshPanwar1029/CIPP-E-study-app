@@ -223,3 +223,61 @@ Facts verified by web search: ISO/IEC 42005:2025 (impact assessment) and 42006:2
 Mount again served stale/truncated bash reads of freshly edited files (aiGov.ts, AiGov.tsx, aiGov.test.ts); real files verified correct via file tools. Sandbox copies reconstructed by heredoc for verification. Also: workspace restart cleared /tmp — reinstalled node_modules.
 
 Verification: `npm run build` pass; `npm run test` 29/29 (62 module questions).
+
+---
+
+## 2026-07-25 — Multi-track: AIGP added alongside CIPP/E (user request)
+
+Source material: the user's two uploaded AIGP study guides, plus the official **AIGP Body of
+Knowledge & Exam Blueprint v2.1** (approved 9 Sep 2025, effective 2 Feb 2026) fetched for the
+min/max item counts the study guide references but does not print.
+
+| # | Decision | Options | Chosen | Why |
+|---|----------|---------|--------|-----|
+| D41 | Two certifications in one app | Separate app/build vs runtime track switch | **Track registry (`src/lib/tracks.ts`) + active-track state** | One SRS engine, one analytics stack, one set of screens, parameterised by a `TrackDef` (blueprint tree, content, exam format). Adding a third certification = one registry entry. |
+| D42 | Data isolation | Separate DBs vs tagged rows | **Dexie v4: `track` field on reviews and mocks, indexed; item ids are globally unique** | Store keeps `allSrs/allReviews/allMocks` and exposes track-filtered `srs/reviews/mocks/items` — every screen consumes the filtered view unchanged. Migration tags all pre-existing rows `cippe` and moves `examDate` → `examDates.cippe`. |
+| D43 | Blueprint helpers | Duplicate per track vs generalise | **`totalMidpoint/domainWeight/maxDomainWeight/allocateForm` now take a `Domain[]`** | Same largest-remainder allocation serves both trees; `DOMAINS` kept as a CIPP/E alias so nothing else broke. |
+| D44 | AIGP blueprint invariant | Copy the CIPP/E test | **Assert MIDPOINT reconciliation, not min/max sums** | Unlike CIPP/E, AIGP domain ranges are tighter than the sum of competency ranges (I: 16–20 vs 15–21). Midpoints do reconcile and sum to 85 scored items of a 100-item exam — and midpoints are what drive weighting. Caught by the new test. |
+| D45 | AI & Governance module placement | AIGP-only vs shared vs merged | **Shared by both tracks** (user's choice) | Content is relevant to both; keeps its own `moduleStats`, still outside blueprint analytics. |
+| D46 | Multi-select support | Skip vs support | **Authored 11 multi-select items; QuestionView now shows "select N · no partial credit"** | The real AIGP exam includes "select 3 of 5, no partial credit" items; `sameSet` scoring already required exact matches. |
+
+### Built
+- New: `src/lib/tracks.ts` (+`tracks.test.ts`), `src/data/aigp/{blueprint,refs,learn,questions,questions2,flashcards,confusionPairs,index,content.test}.ts`.
+- AIGP content: 4 domains / 13 competencies with performance indicators; **71 questions** (blueprint-weighted, 11 multi-select, ~45% applied tier), 42 flashcards, 40 reference nodes (EU AI Act articles, GDPR intersections, IP/non-discrimination/consumer/product-liability, Colorado, South Korea, NIST AI RMF + GenAI Profile, ISO 22989/42001/42005/23894, OECD, CoE/HUDERIA), 13 Learn notes, 8 confusion pairs.
+- Modified: blueprint/stats/mock generalised; store (track state + scoping); db (v4 migration); Dashboard (switcher + track-aware planner/analytics), Learn, Session, Results, Reference, Settings, Layout, MockRunner, QuestionView; app renamed "IAPP Prep" in `index.html` and the PWA manifest.
+
+Verification: `npm run build` pass; `npm run test` **49/49** (was 29). CIPP/E behaviour unchanged by design.
+
+---
+
+## 2026-07-25 — AIGP bank 71 → 144; cross-track citation fix
+
+| # | Decision | Options | Chosen | Why |
+|---|----------|---------|--------|-----|
+| D47 | Citation chips for AIGP items | Leave as-is vs per-track lookup | **`ALL_REFS_BY_ID` in tracks.ts, used by QuestionView and CardView** | Both views resolved refs through the CIPP/E-only `lawRefsById`, so AIGP items rendered raw ids ("aia:Art.5") instead of "EU AI Act Art. 5". Found in a pre-authoring sweep for hardcoded CIPP/E dependencies. |
+| D48 | Bank growth | One large batch vs weighted batches | **Three batches: 3 (Domains I–II, 22), 4 (Domains III–IV, 27), 5 (recall/comprehension, 24)** | Batches 3–4 are scenario-led (incl. multi-paragraph CASE items, matching the real exam's case studies); batch 5 rebalances cognitive level. |
+| D49 | Bloom mix drift | Loosen the test vs author to fix it | **Authored batch 5** | After batches 3–4 the bank hit exactly 75% applied tier and the content test failed. IAPP exams sit across remember/understand AND apply/analyze, so the honest fix was more recall items, not a weaker assertion. Test band tightened to 45–70% applied. |
+
+Bank now **144 questions / 26 multi-select**, per-competency share within ~1.5pp of blueprint weight everywhere (II.D +1.5, IV.C −1.4). Test thresholds raised: ≥140 questions, ≥18 multi-select, ≥6 per competency, plus a new assertion that the heaviest competency outweighs the lightest.
+
+Verification: `npm run build` pass; `npm run test` **50/50**, run against the copy in the project folder.
+
+---
+
+## 2026-07-25 — AIGP case studies + bank to 191
+
+The AIGP exam "includes case studies that present real-world challenges" (per the IAPP study guide),
+so the bank now has that format. Scenarios researched against current events rather than invented.
+
+| # | Decision | Options | Chosen | Why |
+|---|----------|---------|--------|-----|
+| D50 | Case-study data model | Separate case entity with its own runner vs scenario carried on the question | **Optional `scenario` / `caseId` / `caseTitle` on `Question`** | Case items then flow through drill, mock, SRS and analytics with zero new plumbing — and because the scenario travels with each question, an item still reads correctly when spaced repetition surfaces it alone months later. A `TrackDef.cases` list drives the Session UI. |
+| D51 | Case runner | New component vs reuse | **Reuse `DrillRunner` with the case's questions as the queue** | Free keyboard nav, immediate feedback, confidence grading and SRS integration. QuestionView renders the scenario in a bordered box above the stem. |
+| D52 | Grounding | Invent scenarios vs research | **All 8 modelled on documented events** (dealer-chatbot prompt injection; agentic model executing unapproved trades then misreporting; consumer chatbot duty-of-care litigation; the Aug-2026 AI Act position; clinical model applied to an unlike population; improperly licensed/scraped training corpus; Amazon-style promotion bias found late; hosted-model deprecation) | Each case carries a `groundedIn` line shown in the UI, so the learner sees the real-world pattern behind the fiction. Sensitive subject matter is handled at the governance-control level only. |
+| D53 | Bloom drift, again | Loosen band vs author recall items | **Batch 6 (14 recall/comprehension items)** | Case questions are inherently applied; after them the bank hit 68.4%. Batch 6 brought it to 63.4%, inside the 45–70% band. |
+
+Bank: **191 questions** (34 multi-select, 8 cases / 33 linked questions), 63.4% applied tier.
+New tests assert: ≥8 cases, ≥4 questions each, scenario/title identical across a case's questions,
+no orphan `caseId`, every case >60% applied tier and spanning more than one domain.
+
+Verification: `npm run build` pass; `npm run test` **52/52**, run against the copy in the project folder.
